@@ -1,11 +1,13 @@
 package analyzer
 
 import (
-	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"gopkg.in/yaml.v3"
 )
 
 // ProjectType represents the type of project detected
@@ -15,66 +17,98 @@ type ProjectType struct {
 	BaseImage    string
 	Dependencies []string
 	Ports        []string
+	Database     string
+	Environment  []string
 }
 
-// PackageJSON represents a Node.js package.json file
-type PackageJSON struct {
-	Dependencies    map[string]string `json:"dependencies"`
-	DevDependencies map[string]string `json:"devDependencies"`
-	Scripts         map[string]string `json:"scripts"`
+// LanguageConfig represents a language configuration from YAML
+type LanguageConfig struct {
+	Name           string                     `yaml:"name"`
+	FileIndicators []string                   `yaml:"file_indicators"`
+	BaseImage      string                     `yaml:"base_image"`
+	BuildFlags     []string                   `yaml:"build_flags,omitempty"`
+	Frameworks     map[string]FrameworkConfig `yaml:"frameworks"`
+}
+
+// FrameworkConfig represents a framework configuration from YAML
+type FrameworkConfig struct {
+	Name            string   `yaml:"name"`
+	Dependencies    []string `yaml:"dependencies"`
+	Port            int      `yaml:"port"`
+	BuildCommand    string   `yaml:"build_command,omitempty"`
+	StartCommand    string   `yaml:"start_command"`
+	DevCommand      string   `yaml:"dev_command,omitempty"`
+	DatabaseOptions []string `yaml:"database_options,omitempty"`
+	Environment     []string `yaml:"environment,omitempty"`
+	FilePermissions []string `yaml:"file_permissions,omitempty"`
+}
+
+// loadLanguageConfig loads language configuration from YAML file
+func loadLanguageConfig(langFile string) (*LanguageConfig, error) {
+	data, err := ioutil.ReadFile(langFile)
+	if err != nil {
+		return nil, err
+	}
+
+	var config LanguageConfig
+	if err := yaml.Unmarshal(data, &config); err != nil {
+		return nil, err
+	}
+
+	return &config, nil
 }
 
 // AnalyzeProject analyzes the given directory and returns project information
 func AnalyzeProject(path string) (*ProjectType, error) {
 	project := &ProjectType{}
 
-	// Check for common project files
+	// Get supported languages configurations
+	supportedLangs, err := filepath.Glob("supported/*.yaml")
+	if err != nil {
+		return nil, fmt.Errorf("failed to read supported languages: %w", err)
+	}
+
+	// Check project files
 	files, err := os.ReadDir(path)
 	if err != nil {
 		return nil, err
 	}
 
+	// Create a map of found files for quick lookup
+	foundFiles := make(map[string]bool)
 	for _, file := range files {
-		fileName := file.Name()
-		switch {
-		case fileName == "package.json":
-			project.Language = "nodejs"
-			project.BaseImage = "node:18-alpine"
-			if err := detectNodeFramework(path, project); err != nil {
-				return nil, err
-			}
+		foundFiles[file.Name()] = true
+	}
 
-		case fileName == "requirements.txt":
-			project.Language = "python"
-			project.BaseImage = "python:3.9-slim"
-			if err := detectPythonFramework(path, project); err != nil {
-				return nil, err
-			}
+	// Check each language configuration
+	for _, langFile := range supportedLangs {
+		if langFile == "supported/databases.yaml" {
+			continue
+		}
 
-		case fileName == "go.mod":
-			project.Language = "go"
-			project.BaseImage = "golang:1.21-alpine"
-			if err := detectGoFramework(path, project); err != nil {
-				return nil, err
-			}
+		config, err := loadLanguageConfig(langFile)
+		if err != nil {
+			continue
+		}
 
-		case fileName == "pom.xml":
-			project.Language = "java"
-			project.BaseImage = "openjdk:17-slim"
-			project.Framework = "spring-boot" // Assuming Spring Boot for now
+		// Check if any of the file indicators exist
+		for _, indicator := range config.FileIndicators {
+			if foundFiles[indicator] {
+				project.Language = config.Name
+				project.BaseImage = config.BaseImage
 
-		case fileName == "composer.json":
-			project.Language = "php"
-			project.BaseImage = "php:8.2-fpm"
-			if err := detectPHPFramework(path, project); err != nil {
-				return nil, err
-			}
+				// Update base image based on detected version
+				if err := UpdateBaseImage(project); err != nil {
+					// Log error but continue with default version
+					fmt.Printf("Warning: Could not detect version, using default: %v\n", err)
+				}
 
-		case fileName == "Gemfile":
-			project.Language = "ruby"
-			project.BaseImage = "ruby:3.2-alpine"
-			if err := detectRubyFramework(path, project); err != nil {
-				return nil, err
+				// Detect framework
+				if err := detectFramework(path, project, config); err != nil {
+					return nil, err
+				}
+
+				return project, nil
 			}
 		}
 	}
@@ -82,19 +116,37 @@ func AnalyzeProject(path string) (*ProjectType, error) {
 	return project, nil
 }
 
-func detectNodeFramework(path string, project *ProjectType) error {
+func detectFramework(path string, project *ProjectType, config *LanguageConfig) error {
+	switch project.Language {
+	case "Node.js":
+		return detectNodeFramework(path, project, config)
+	case "Python":
+		return detectPythonFramework(path, project, config)
+	case "Go":
+		return detectGoFramework(path, project, config)
+	case "PHP":
+		return detectPHPFramework(path, project, config)
+	}
+	return nil
+}
+
+func detectNodeFramework(path string, project *ProjectType, config *LanguageConfig) error {
 	packageJSONPath := filepath.Join(path, "package.json")
 	data, err := ioutil.ReadFile(packageJSONPath)
 	if err != nil {
 		return err
 	}
 
-	var packageJSON PackageJSON
-	if err := json.Unmarshal(data, &packageJSON); err != nil {
+	var packageJSON struct {
+		Dependencies    map[string]string `json:"dependencies"`
+		DevDependencies map[string]string `json:"devDependencies"`
+	}
+
+	if err := yaml.Unmarshal(data, &packageJSON); err != nil {
 		return err
 	}
 
-	// Check for common frameworks in dependencies
+	// Combine dependencies
 	deps := make(map[string]string)
 	for k, v := range packageJSON.Dependencies {
 		deps[k] = v
@@ -103,61 +155,46 @@ func detectNodeFramework(path string, project *ProjectType) error {
 		deps[k] = v
 	}
 
-	switch {
-	case deps["next"] != "":
-		project.Framework = "nextjs"
-		project.Ports = []string{"3000"}
-	case deps["react"] != "":
-		project.Framework = "react"
-		project.Ports = []string{"3000"}
-	case deps["@angular/core"] != "":
-		project.Framework = "angular"
-		project.Ports = []string{"4200"}
-	case deps["express"] != "":
-		project.Framework = "express"
-		project.Ports = []string{"3000"}
-	case deps["@nestjs/core"] != "":
-		project.Framework = "nestjs"
-		project.Ports = []string{"3000"}
-	}
-
-	project.Dependencies = make([]string, 0, len(deps))
-	for dep := range deps {
-		project.Dependencies = append(project.Dependencies, dep)
-	}
-
-	return nil
-}
-
-func detectPythonFramework(path string, project *ProjectType) error {
-	reqPath := filepath.Join(path, "requirements.txt")
-	data, err := ioutil.ReadFile(reqPath)
-	if err != nil {
-		return err
-	}
-
-	requirements := strings.Split(string(data), "\n")
-	project.Dependencies = requirements
-
-	for _, req := range requirements {
-		req = strings.ToLower(strings.TrimSpace(req))
-		switch {
-		case strings.HasPrefix(req, "django"):
-			project.Framework = "django"
-			project.Ports = []string{"8000"}
-		case strings.HasPrefix(req, "flask"):
-			project.Framework = "flask"
-			project.Ports = []string{"5000"}
-		case strings.HasPrefix(req, "fastapi"):
-			project.Framework = "fastapi"
-			project.Ports = []string{"8000"}
+	// Check each framework
+	for name, framework := range config.Frameworks {
+		for _, dep := range framework.Dependencies {
+			if _, ok := deps[dep]; ok {
+				project.Framework = name
+				if framework.Port != 0 {
+					project.Ports = []string{fmt.Sprintf("%d", framework.Port)}
+				}
+				return nil
+			}
 		}
 	}
 
 	return nil
 }
 
-func detectGoFramework(path string, project *ProjectType) error {
+func detectPythonFramework(path string, project *ProjectType, config *LanguageConfig) error {
+	reqPath := filepath.Join(path, "requirements.txt")
+	data, err := ioutil.ReadFile(reqPath)
+	if err != nil {
+		return err
+	}
+
+	content := string(data)
+	for name, framework := range config.Frameworks {
+		for _, dep := range framework.Dependencies {
+			if strings.Contains(content, dep) {
+				project.Framework = name
+				if framework.Port != 0 {
+					project.Ports = []string{fmt.Sprintf("%d", framework.Port)}
+				}
+				return nil
+			}
+		}
+	}
+
+	return nil
+}
+
+func detectGoFramework(path string, project *ProjectType, config *LanguageConfig) error {
 	modPath := filepath.Join(path, "go.mod")
 	data, err := ioutil.ReadFile(modPath)
 	if err != nil {
@@ -165,22 +202,22 @@ func detectGoFramework(path string, project *ProjectType) error {
 	}
 
 	content := string(data)
-	switch {
-	case strings.Contains(content, "github.com/gin-gonic/gin"):
-		project.Framework = "gin"
-		project.Ports = []string{"8080"}
-	case strings.Contains(content, "github.com/gofiber/fiber"):
-		project.Framework = "fiber"
-		project.Ports = []string{"3000"}
-	case strings.Contains(content, "github.com/labstack/echo"):
-		project.Framework = "echo"
-		project.Ports = []string{"1323"}
+	for name, framework := range config.Frameworks {
+		for _, dep := range framework.Dependencies {
+			if strings.Contains(content, dep) {
+				project.Framework = name
+				if framework.Port != 0 {
+					project.Ports = []string{fmt.Sprintf("%d", framework.Port)}
+				}
+				return nil
+			}
+		}
 	}
 
 	return nil
 }
 
-func detectPHPFramework(path string, project *ProjectType) error {
+func detectPHPFramework(path string, project *ProjectType, config *LanguageConfig) error {
 	composerPath := filepath.Join(path, "composer.json")
 	data, err := ioutil.ReadFile(composerPath)
 	if err != nil {
@@ -190,35 +227,21 @@ func detectPHPFramework(path string, project *ProjectType) error {
 	var composer struct {
 		Require map[string]string `json:"require"`
 	}
-	if err := json.Unmarshal(data, &composer); err != nil {
+
+	if err := yaml.Unmarshal(data, &composer); err != nil {
 		return err
 	}
 
-	for dep := range composer.Require {
-		switch {
-		case strings.Contains(dep, "laravel"):
-			project.Framework = "laravel"
-			project.Ports = []string{"8000"}
-		case strings.Contains(dep, "symfony"):
-			project.Framework = "symfony"
-			project.Ports = []string{"8000"}
+	for name, framework := range config.Frameworks {
+		for _, dep := range framework.Dependencies {
+			if _, ok := composer.Require[dep]; ok {
+				project.Framework = name
+				if framework.Port != 0 {
+					project.Ports = []string{fmt.Sprintf("%d", framework.Port)}
+				}
+				return nil
+			}
 		}
-	}
-
-	return nil
-}
-
-func detectRubyFramework(path string, project *ProjectType) error {
-	gemfilePath := filepath.Join(path, "Gemfile")
-	data, err := ioutil.ReadFile(gemfilePath)
-	if err != nil {
-		return err
-	}
-
-	content := string(data)
-	if strings.Contains(content, "rails") {
-		project.Framework = "rails"
-		project.Ports = []string{"3000"}
 	}
 
 	return nil

@@ -7,16 +7,17 @@ Dockerizer CLI is a command-line tool that automatically containerizes software 
 - 🔍 Automatic language and framework detection
 - 📦 Optimized Dockerfile generation with multi-stage builds
 - 🛠 Docker Compose support with database and cache services
-- 🚀 Easy to use and quick to start
+- 🚀 Interactive setup process
+- 💡 Smart defaults with customization options
 
-## Supported Languages and Frameworks
+## Supported Technologies
 
-- **Node.js**: Next.js, React, Angular, Express, NestJS
-- **Python**: Django, Flask, FastAPI
-- **Go**: Gin, Fiber, Echo
-- **PHP**: Laravel, Symfony
-- **Ruby**: Rails
-- **Java**: Spring Boot
+All supported technologies are defined in `config/supported_tech.yaml`:
+
+- **Languages**: Node.js, Python, Go, PHP, Ruby, Java
+- **Frameworks**: Next.js, React, Angular, Express, NestJS, Django, Flask, FastAPI, Gin, Fiber, Echo, Laravel, Symfony, Rails, Spring Boot
+- **Databases**: PostgreSQL, MySQL, MongoDB
+- **Cache**: Redis
 
 ## Installation
 
@@ -33,52 +34,52 @@ Dockerizer CLI is a command-line tool that automatically containerizes software 
 
 3. Build and install:
    ```bash
-   go install
+   make install
    ```
 
 ### Binary Installation
 
-1. Download the appropriate binary for your operating system from the [Releases](https://github.com/ravanbabayev/dockerizer-cli/releases) page
+1. Download the appropriate binary for your operating system from the [Releases](https://github.com/username/dockerizer-cli/releases) page
 2. Extract the downloaded archive
 3. Add the binary to your PATH or move it to an appropriate location
 
 ## Usage
 
-1. Analyze your project:
-   ```bash
-   dockerizer init --path /project/directory
-   ```
+Simply navigate to your project directory and run:
 
-2. Generate Docker files:
-   ```bash
-   dockerizer generate --path /project/directory --output /output/directory
-   ```
-
-3. Clean up generated files:
-   ```bash
-   dockerizer clean --output /output/directory
-   ```
-
-## Example Usage
-
-For a React project:
 ```bash
-# Navigate to project directory
-cd my-react-app
+dockerize init
+```
 
-# Analyze the project
-dockerizer init
+The tool will:
+1. Analyze your project structure
+2. Detect the programming language and framework
+3. Ask for confirmation or alternative selection
+4. Offer database integration options
+5. Generate optimized Docker files
 
-# Generate Docker files
-dockerizer generate
+## Example
 
-# Start the container
-docker-compose up
+```bash
+$ cd my-project
+$ dockerize init
+
+✔ Detected Node.js as the project language. Is this correct? [Y/n] y
+✔ Detected React as the framework. Is this correct? [Y/n] y
+✔ Does your project need a database? [Y/n] y
+✔ Select database type: PostgreSQL
+
+Successfully generated Docker files!
+
+Next steps:
+1. Review the generated files
+2. Build and run your container:
+   docker-compose up --build
 ```
 
 ## Requirements
 
-- Go 1.16 or higher
+- Go 1.16 or higher (for building from source)
 - Docker
 - Docker Compose
 

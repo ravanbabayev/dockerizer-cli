@@ -1,0 +1,41 @@
+name: "PHP"
+file_indicators:
+  - "composer.json"
+base_image: "php:8.2-fpm"
+
+frameworks:
+  laravel:
+    name: "Laravel"
+    dependencies: ["laravel/framework"]
+    port: 8000
+    build_command: "composer install --no-dev --optimize-autoloader"
+    start_command: "php artisan serve --host=0.0.0.0 --port=8000"
+    dev_command: "php artisan serve"
+    database_options:
+      - "mysql"
+      - "postgres"
+    environment:
+      - "APP_ENV=production"
+    additional_services:
+      - "redis"
+    file_permissions:
+      - "storage"
+      - "bootstrap/cache"
+
+  symfony:
+    name: "Symfony"
+    dependencies: ["symfony/framework-bundle"]
+    port: 8000
+    build_command: "composer install --no-dev --optimize-autoloader"
+    start_command: "php -S 0.0.0.0:8000 -t public"
+    dev_command: "symfony serve"
+    database_options:
+      - "mysql"
+      - "postgres"
+    environment:
+      - "APP_ENV=prod"
+    additional_services:
+      - "redis"
+    file_permissions:
+      - "var"
+      - "public" 

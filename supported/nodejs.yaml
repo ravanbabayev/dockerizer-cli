@@ -1,0 +1,51 @@
+name: "Node.js"
+file_indicators:
+  - "package.json"
+base_image: "node:18-alpine"
+
+frameworks:
+  nextjs:
+    name: "Next.js"
+    dependencies: ["next"]
+    port: 3000
+    build_command: "npm run build"
+    start_command: "npm start"
+    dev_command: "npm run dev"
+
+  react:
+    name: "React"
+    dependencies: ["react"]
+    port: 3000
+    build_command: "npm run build"
+    start_command: "npm start"
+    dev_command: "npm start"
+
+  angular:
+    name: "Angular"
+    dependencies: ["@angular/core"]
+    port: 4200
+    build_command: "npm run build --prod"
+    start_command: "serve -s dist"
+    dev_command: "ng serve"
+
+  express:
+    name: "Express"
+    dependencies: ["express"]
+    port: 3000
+    start_command: "node index.js"
+    dev_command: "nodemon index.js"
+    database_options:
+      - "mongodb"
+      - "mysql"
+      - "postgres"
+
+  nestjs:
+    name: "NestJS"
+    dependencies: ["@nestjs/core"]
+    port: 3000
+    build_command: "npm run build"
+    start_command: "npm run start:prod"
+    dev_command: "npm run start:dev"
+    database_options:
+      - "mongodb"
+      - "postgres" 

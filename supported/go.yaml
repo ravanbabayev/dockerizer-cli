@@ -1,0 +1,41 @@
+name: "Go"
+file_indicators:
+  - "go.mod"
+base_image: "golang:1.21-alpine"
+build_flags:
+  - "CGO_ENABLED=0"
+  - "GOOS=linux"
+
+frameworks:
+  gin:
+    name: "Gin"
+    dependencies: ["github.com/gin-gonic/gin"]
+    port: 8080
+    build_command: "go build -o main ."
+    start_command: "./main"
+    dev_command: "go run main.go"
+    database_options:
+      - "postgres"
+      - "mongodb"
+
+  fiber:
+    name: "Fiber"
+    dependencies: ["github.com/gofiber/fiber/v2"]
+    port: 3000
+    build_command: "go build -o main ."
+    start_command: "./main"
+    dev_command: "go run main.go"
+    database_options:
+      - "postgres"
+      - "mongodb"
+
+  echo:
+    name: "Echo"
+    dependencies: ["github.com/labstack/echo/v4"]
+    port: 1323
+    build_command: "go build -o main ."
+    start_command: "./main"
+    dev_command: "go run main.go"
+    database_options:
+      - "postgres"
+      - "mongodb" 

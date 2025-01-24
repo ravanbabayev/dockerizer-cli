@@ -1,0 +1,60 @@
+databases:
+  postgres:
+    name: "PostgreSQL"
+    image: "postgres:13-alpine"
+    port: 5432
+    environment:
+      - "POSTGRES_USER=postgres"
+      - "POSTGRES_PASSWORD=postgres"
+      - "POSTGRES_DB=app"
+    volumes:
+      - "postgres-data:/var/lib/postgresql/data"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: "10s"
+      timeout: "5s"
+      retries: 5
+
+  mysql:
+    name: "MySQL"
+    image: "mysql:8.0"
+    port: 3306
+    environment:
+      - "MYSQL_ROOT_PASSWORD=root"
+      - "MYSQL_DATABASE=app"
+    volumes:
+      - "mysql-data:/var/lib/mysql"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: "10s"
+      timeout: "5s"
+      retries: 5
+
+  mongodb:
+    name: "MongoDB"
+    image: "mongo:4.4"
+    port: 27017
+    environment:
+      - "MONGO_INITDB_ROOT_USERNAME=root"
+      - "MONGO_INITDB_ROOT_PASSWORD=root"
+      - "MONGO_INITDB_DATABASE=app"
+    volumes:
+      - "mongodb-data:/data/db"
+    healthcheck:
+      test: ["CMD", "mongo", "--eval", "db.adminCommand('ping')"]
+      interval: "10s"
+      timeout: "5s"
+      retries: 5
+
+cache_services:
+  redis:
+    name: "Redis"
+    image: "redis:alpine"
+    port: 6379
+    volumes:
+      - "redis-data:/data"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: "10s"
+      timeout: "5s"
+      retries: 5 
