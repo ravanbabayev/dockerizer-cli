@@ -1,6 +1,7 @@
 package analyzer
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -80,7 +81,25 @@ func AnalyzeProject(path string) (*ProjectType, error) {
 		foundFiles[file.Name()] = true
 	}
 
-	// Check each language configuration
+	// First check for composer.json to detect PHP/Laravel
+	if foundFiles["composer.json"] {
+		data, err := ioutil.ReadFile(filepath.Join(path, "composer.json"))
+		if err == nil {
+			var composerJSON map[string]interface{}
+			if err := json.Unmarshal(data, &composerJSON); err == nil {
+				if require, ok := composerJSON["require"].(map[string]interface{}); ok {
+					if _, hasLaravel := require["laravel/framework"]; hasLaravel {
+						project.Language = "PHP"
+						project.Framework = "laravel"
+						project.Ports = []string{"9000"}
+						return project, nil
+					}
+				}
+			}
+		}
+	}
+
+	// Check other languages
 	for _, langFile := range supportedLangs {
 		if langFile == "supported/databases.yaml" {
 			continue
@@ -95,20 +114,11 @@ func AnalyzeProject(path string) (*ProjectType, error) {
 		for _, indicator := range config.FileIndicators {
 			if foundFiles[indicator] {
 				project.Language = config.Name
-				project.BaseImage = config.BaseImage
-
-				// Update base image based on detected version
-				if err := UpdateBaseImage(project); err != nil {
-					// Log error but continue with default version
-					fmt.Printf("Warning: Could not detect version, using default: %v\n", err)
+				// Try to detect framework
+				if err := detectFramework(path, project, config); err == nil {
+					return project, nil
 				}
-
-				// Detect framework
-				if err := detectFramework(path, project, config); err != nil {
-					return nil, err
-				}
-
-				return project, nil
+				break
 			}
 		}
 	}

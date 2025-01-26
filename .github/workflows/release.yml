@@ -20,12 +20,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Clean cache directory
-        run: |
-          rm -rf ${{ runner.tool_cache }}/go
-          rm -rf build
-          rm -rf release
-
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
@@ -34,48 +28,32 @@ jobs:
       - name: Build binaries
         run: |
           # Create fresh directories
-          mkdir -p build/windows build/linux build/darwin
           mkdir -p release
           
-          # Build binaries
-          echo "Building Windows binary..."
-          GOOS=windows GOARCH=amd64 go build -o build/windows/dockerizer.exe cmd/main.go
+          # Build for each platform
+          echo "Building for Windows..."
+          GOOS=windows GOARCH=amd64 go build -o dockerizer.exe cmd/main.go
+          mkdir -p dockerizer-windows
+          mv dockerizer.exe dockerizer-windows/
+          cp -r supported dockerizer-windows/
+          cd dockerizer-windows && zip -r ../release/dockerizer-windows-amd64.zip * && cd ..
+          rm -rf dockerizer-windows
           
-          echo "Building Linux binary..."
-          GOOS=linux GOARCH=amd64 go build -o build/linux/dockerizer cmd/main.go
+          echo "Building for Linux..."
+          GOOS=linux GOARCH=amd64 go build -o dockerizer cmd/main.go
+          mkdir -p dockerizer-linux
+          mv dockerizer dockerizer-linux/
+          cp -r supported dockerizer-linux/
+          cd dockerizer-linux && tar czf ../release/dockerizer-linux-amd64.tar.gz * && cd ..
+          rm -rf dockerizer-linux
           
-          echo "Building macOS binary..."
-          GOOS=darwin GOARCH=amd64 go build -o build/darwin/dockerizer cmd/main.go
-
-      - name: Prepare release packages
-        run: |
-          # Debug: Show current directory structure
-          echo "Current directory structure:"
-          ls -la
-          
-          # Check supported directory
-          if [ ! -d "supported" ]; then
-            echo "Error: supported directory not found"
-            pwd
-            exit 1
-          fi
-          
-          # Create release packages
-          echo "Creating Windows package..."
-          cp -rv supported/* build/windows/
-          cd build/windows && zip -r ../../release/dockerizer-windows-amd64.zip . && cd ../..
-          
-          echo "Creating Linux package..."
-          cp -rv supported/* build/linux/
-          cd build/linux && tar czf ../../release/dockerizer-linux-amd64.tar.gz . && cd ../..
-          
-          echo "Creating macOS package..."
-          cp -rv supported/* build/darwin/
-          cd build/darwin && tar czf ../../release/dockerizer-darwin-amd64.tar.gz . && cd ../..
-          
-          # Verify release files
-          echo "Release files:"
-          ls -la release/
+          echo "Building for macOS..."
+          GOOS=darwin GOARCH=amd64 go build -o dockerizer cmd/main.go
+          mkdir -p dockerizer-darwin
+          mv dockerizer dockerizer-darwin/
+          cp -r supported dockerizer-darwin/
+          cd dockerizer-darwin && tar czf ../release/dockerizer-darwin-amd64.tar.gz * && cd ..
+          rm -rf dockerizer-darwin
 
       - name: Create Release
         id: create_release

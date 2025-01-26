@@ -95,23 +95,74 @@ func GenerateCompose(project *analyzer.ProjectType, outputPath string) error {
 		EnvFile:  []string{".env"},
 	}
 
-	if len(project.Ports) > 0 {
+	// Special handling for Laravel
+	if project.Framework == "laravel" {
+		appService.Volumes = []string{
+			".:/var/www/html",
+		}
+		// Add nginx service for Laravel
+		compose.Services["nginx"] = Service{
+			Image: "nginx:alpine",
+			Ports: []string{"80:80"},
+			Volumes: []string{
+				".:/var/www/html",
+				"./docker/nginx/conf.d:/etc/nginx/conf.d",
+			},
+			Networks:  []string{"app-network"},
+			DependsOn: []string{"app"},
+		}
+
+		// Create nginx config directory and configuration
+		nginxConfigDir := filepath.Join(outputPath, "docker", "nginx", "conf.d")
+		if err := os.MkdirAll(nginxConfigDir, 0755); err != nil {
+			return fmt.Errorf("failed to create nginx config directory: %w", err)
+		}
+
+		nginxConfig := `server {
+    listen 80;
+    index index.php index.html;
+    server_name localhost;
+    error_log  /var/log/nginx/error.log;
+    access_log /var/log/nginx/access.log;
+    root /var/www/html/public;
+
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    location ~ \.php$ {
+        try_files $uri =404;
+        fastcgi_split_path_info ^(.+\.php)(/.+)$;
+        fastcgi_pass app:9000;
+        fastcgi_index index.php;
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_param PATH_INFO $fastcgi_path_info;
+    }
+}`
+
+		if err := os.WriteFile(filepath.Join(nginxConfigDir, "default.conf"), []byte(nginxConfig), 0644); err != nil {
+			return fmt.Errorf("failed to create nginx configuration: %w", err)
+		}
+	} else if len(project.Ports) > 0 {
 		appService.Ports = project.Ports
 	}
 
 	compose.Services["app"] = appService
 
-	// Add database service based on framework
-	dbConfig := getDefaultDBConfig(project)
-	if dbConfig != nil {
-		dbService := createDatabaseService(dbConfig)
-		compose.Services[dbConfig.Type] = dbService
-		compose.Volumes[fmt.Sprintf("%s-data", dbConfig.Type)] = Volume{Driver: "local"}
+	// Add database service if needed
+	if project.Database != "" {
+		dbConfig := getDefaultDBConfig(project)
+		if dbConfig != nil {
+			dbService := createDatabaseService(dbConfig)
+			compose.Services[dbConfig.Type] = dbService
+			compose.Volumes[fmt.Sprintf("%s-data", dbConfig.Type)] = Volume{Driver: "local"}
 
-		// Update app service to depend on database
-		appService := compose.Services["app"]
-		appService.DependsOn = append(appService.DependsOn, dbConfig.Type)
-		compose.Services["app"] = appService
+			// Update app service to depend on database
+			appService := compose.Services["app"]
+			appService.DependsOn = append(appService.DependsOn, dbConfig.Type)
+			compose.Services["app"] = appService
+		}
 	}
 
 	// Add cache service if needed

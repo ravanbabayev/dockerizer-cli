@@ -9,7 +9,7 @@ import (
 )
 
 // DockerfileTemplate represents the basic structure for a Dockerfile
-const DockerfileTemplate = `{{ if eq .Language "nodejs" }}
+const DockerfileTemplate = `{{ if eq .Language "Node.js" }}
 # Build stage
 FROM node:18-alpine AS builder
 WORKDIR /app
@@ -53,7 +53,61 @@ CMD ["serve", "-s", "dist"]
 CMD ["node", "index.js"]
 {{ end }}
 
-{{ else if eq .Language "python" }}
+{{ else if eq .Language "PHP" }}
+# Build stage
+FROM composer:latest AS builder
+WORKDIR /app
+COPY composer.json composer.lock ./
+RUN composer install --no-dev --optimize-autoloader
+
+# Production stage
+FROM php:8.2-fpm
+WORKDIR /var/www/html
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    git \
+    curl \
+    libpng-dev \
+    libonig-dev \
+    libxml2-dev \
+    zip \
+    unzip
+
+# Clear cache
+RUN apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Install PHP extensions
+RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd
+
+# Copy composer dependencies
+COPY --from=builder /app/vendor ./vendor
+
+# Copy application files
+COPY . .
+
+{{ if eq .Framework "laravel" }}
+# Set Laravel storage permissions
+RUN chown -R www-data:www-data \
+    storage \
+    bootstrap/cache \
+    vendor
+
+# Set Laravel environment
+ENV APP_ENV=production
+ENV APP_DEBUG=false
+
+# Expose port
+EXPOSE {{ index .Ports 0 }}
+
+# Start PHP-FPM
+CMD ["php-fpm"]
+{{ else }}
+EXPOSE 9000
+CMD ["php-fpm"]
+{{ end }}
+
+{{ else if eq .Language "Python" }}
 # Build stage
 FROM python:3.9-slim AS builder
 WORKDIR /app
@@ -80,7 +134,7 @@ CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 CMD ["python", "app.py"]
 {{ end }}
 
-{{ else if eq .Language "go" }}
+{{ else if eq .Language "Go" }}
 # Build stage
 FROM golang:1.21-alpine AS builder
 WORKDIR /app
@@ -98,81 +152,57 @@ COPY --from=builder /app/main .
 EXPOSE {{ . }}
 {{ end }}
 CMD ["./main"]
-
-{{ else if eq .Language "java" }}
-# Build stage
-FROM maven:3.8.4-openjdk-17-slim AS builder
-WORKDIR /app
-COPY pom.xml .
-COPY src ./src
-RUN mvn clean package -DskipTests
-
-# Production stage
-FROM openjdk:17-slim
-WORKDIR /app
-COPY --from=builder /app/target/*.jar app.jar
-EXPOSE 8080
-CMD ["java", "-jar", "app.jar"]
-
-{{ else if eq .Language "php" }}
-# Build stage
-FROM composer:latest AS builder
-WORKDIR /app
-COPY composer.json composer.lock ./
-RUN composer install --no-dev --optimize-autoloader
-
-# Production stage
-FROM php:8.2-fpm
-WORKDIR /var/www/html
-COPY --from=builder /app/vendor ./vendor
-COPY . .
-{{ if eq .Framework "laravel" }}
-RUN chown -R www-data:www-data storage bootstrap/cache
-EXPOSE 9000
-CMD ["php-fpm"]
-{{ else }}
-EXPOSE 9000
-CMD ["php-fpm"]
-{{ end }}
-
-{{ else if eq .Language "ruby" }}
-# Build stage
-FROM ruby:3.2-alpine AS builder
-WORKDIR /app
-COPY Gemfile* ./
-RUN apk add --no-cache build-base
-RUN bundle install --without development test
-
-# Production stage
-FROM ruby:3.2-alpine
-WORKDIR /app
-COPY --from=builder /usr/local/bundle /usr/local/bundle
-COPY . .
-{{ if eq .Framework "rails" }}
-EXPOSE 3000
-CMD ["rails", "server", "-b", "0.0.0.0"]
-{{ else }}
-CMD ["ruby", "app.rb"]
-{{ end }}
-
 {{ end }}`
 
 // GenerateDockerfile creates a Dockerfile based on project analysis
 func GenerateDockerfile(project *analyzer.ProjectType, outputPath string) error {
+	// Validate project configuration
+	if project.Language == "" {
+		return fmt.Errorf("language not detected")
+	}
+
+	// Check if language is supported
+	supportedLanguages := map[string]bool{
+		"Node.js": true,
+		"PHP":     true,
+		"Python":  true,
+		"Go":      true,
+	}
+
+	if !supportedLanguages[project.Language] {
+		return fmt.Errorf("unsupported language: %s", project.Language)
+	}
+
+	// For PHP, ensure framework is Laravel
+	if project.Language == "PHP" && project.Framework != "laravel" {
+		return fmt.Errorf("unsupported PHP framework: %s", project.Framework)
+	}
+
 	tmpl, err := template.New("dockerfile").Parse(DockerfileTemplate)
 	if err != nil {
 		return err
 	}
 
+	// Create Dockerfile
 	file, err := os.Create(outputPath + "/Dockerfile")
 	if err != nil {
 		return err
 	}
 	defer file.Close()
 
+	// Execute template with project data
 	err = tmpl.Execute(file, project)
 	if err != nil {
-		return err
+		// If template execution fails, remove the empty or partial Dockerfile
+		os.Remove(outputPath + "/Dockerfile")
+		return fmt.Errorf("failed to generate Dockerfile: %w", err)
+	}
+
+	// Verify the file is not empty
+	fileInfo, err := file.Stat()
+	if err != nil || fileInfo.Size() == 0 {
+		os.Remove(outputPath + "/Dockerfile")
+		return fmt.Errorf("generated Dockerfile is empty, template conditions not met")
 	}
 
 	fmt.Println("Successfully generated Dockerfile with multi-stage build support")

@@ -19,7 +19,7 @@ import (
 
 func main() {
 	app := &cli.App{
-		Name:  "dockerize",
+		Name:  "dockerizer",
 		Usage: "Automatically dockerize your applications",
 		Commands: []*cli.Command{
 			{
@@ -41,14 +41,10 @@ func main() {
 
 					// Confirm language detection
 					fmt.Printf("✨ Detected %s project\n", project.Language)
-					prompt := promptui.Prompt{
-						Label:     "Is this correct",
-						IsConfirm: true,
-						Default:   "y",
-					}
-
-					result, err := prompt.Run()
-					if err != nil || strings.ToLower(result) != "y" {
+					fmt.Print("Is this correct? [Y/n]: ")
+					var response string
+					fmt.Scanln(&response)
+					if response != "" && strings.ToLower(response) != "y" {
 						return selectLanguageManually(project)
 					}
 
@@ -59,14 +55,9 @@ func main() {
 					}
 
 					fmt.Printf("✨ Detected %s framework\n", project.Framework)
-					prompt = promptui.Prompt{
-						Label:     "Is this correct",
-						IsConfirm: true,
-						Default:   "y",
-					}
-
-					result, err = prompt.Run()
-					if err != nil || strings.ToLower(result) != "y" {
+					fmt.Print("Is this correct? [Y/n]: ")
+					fmt.Scanln(&response)
+					if response != "" && strings.ToLower(response) != "y" {
 						return selectFrameworkManually(project)
 					}
 
@@ -74,46 +65,28 @@ func main() {
 					if len(project.Ports) > 0 {
 						defaultPort := project.Ports[0]
 						fmt.Printf("✨ Default port for %s is %s\n", project.Framework, defaultPort)
-						prompt = promptui.Prompt{
-							Label:     "Would you like to use a different port",
-							IsConfirm: true,
-							Default:   "n",
-						}
-
-						result, err = prompt.Run()
-						if err == nil && strings.ToLower(result) == "y" {
-							// Ask for custom port
-							portPrompt := promptui.Prompt{
-								Label: "Enter port number",
-								Validate: func(input string) error {
-									port, err := strconv.Atoi(input)
-									if err != nil {
-										return fmt.Errorf("please enter a valid port number")
-									}
-									if port < 1 || port > 65535 {
-										return fmt.Errorf("port must be between 1 and 65535")
-									}
-									return nil
-								},
+						fmt.Print("Would you like to use a different port? [y/N]: ")
+						fmt.Scanln(&response)
+						if strings.ToLower(response) == "y" {
+							var portStr string
+							for {
+								fmt.Print("Enter port number: ")
+								fmt.Scanln(&portStr)
+								port, err := strconv.Atoi(portStr)
+								if err != nil || port < 1 || port > 65535 {
+									fmt.Println("Please enter a valid port number between 1 and 65535")
+									continue
+								}
+								project.Ports[0] = portStr
+								break
 							}
-
-							portStr, err := portPrompt.Run()
-							if err != nil {
-								return fmt.Errorf("port selection failed: %w", err)
-							}
-							project.Ports[0] = portStr
 						}
 					}
 
 					// Database selection
-					prompt = promptui.Prompt{
-						Label:     "Does your project need a database",
-						IsConfirm: true,
-						Default:   "y",
-					}
-
-					result, err = prompt.Run()
-					if err == nil && strings.ToLower(result) == "y" {
+					fmt.Print("Does your project need a database? [Y/n]: ")
+					fmt.Scanln(&response)
+					if response == "" || strings.ToLower(response) == "y" {
 						// Load database options from config
 						dbConfig, err := loadDatabaseConfig()
 						if err != nil {
@@ -125,50 +98,47 @@ func main() {
 							dbOptions = append(dbOptions, dbName)
 						}
 
-						selectPrompt := promptui.Select{
-							Label: "Select database type",
-							Items: dbOptions,
+						fmt.Println("\nAvailable databases:")
+						for i, db := range dbOptions {
+							fmt.Printf("%d) %s\n", i+1, db)
 						}
 
-						_, dbType, err := selectPrompt.Run()
-						if err != nil {
-							return fmt.Errorf("database selection failed: %w", err)
+						var dbIndex int
+						for {
+							fmt.Print("Select database (enter number): ")
+							fmt.Scanln(&response)
+							index, err := strconv.Atoi(response)
+							if err != nil || index < 1 || index > len(dbOptions) {
+								fmt.Println("Please enter a valid number")
+								continue
+							}
+							dbIndex = index - 1
+							break
 						}
+
+						dbType := dbOptions[dbIndex]
 						project.Database = dbType
 
 						// Ask for database port
 						dbInfo := dbConfig.Databases[dbType]
 						defaultDBPort := fmt.Sprintf("%d", dbInfo.Port)
 						fmt.Printf("✨ Default port for %s is %s\n", dbType, defaultDBPort)
-						prompt = promptui.Prompt{
-							Label:     "Would you like to use a different port",
-							IsConfirm: true,
-							Default:   "n",
-						}
-
-						result, err = prompt.Run()
-						if err == nil && strings.ToLower(result) == "y" {
-							portPrompt := promptui.Prompt{
-								Label: "Enter database port number",
-								Validate: func(input string) error {
-									port, err := strconv.Atoi(input)
-									if err != nil {
-										return fmt.Errorf("please enter a valid port number")
-									}
-									if port < 1 || port > 65535 {
-										return fmt.Errorf("port must be between 1 and 65535")
-									}
-									return nil
-								},
+						fmt.Print("Would you like to use a different port? [y/N]: ")
+						fmt.Scanln(&response)
+						if strings.ToLower(response) == "y" {
+							var portStr string
+							for {
+								fmt.Print("Enter database port number: ")
+								fmt.Scanln(&portStr)
+								port, err := strconv.Atoi(portStr)
+								if err != nil || port < 1 || port > 65535 {
+									fmt.Println("Please enter a valid port number between 1 and 65535")
+									continue
+								}
+								dbInfo.Port = port
+								dbConfig.Databases[dbType] = dbInfo
+								break
 							}
-
-							portStr, err := portPrompt.Run()
-							if err != nil {
-								return fmt.Errorf("database port selection failed: %w", err)
-							}
-							// Update database port in config
-							dbInfo.Port, _ = strconv.Atoi(portStr)
-							dbConfig.Databases[dbType] = dbInfo
 						}
 					}
 
@@ -176,15 +146,18 @@ func main() {
 
 					// Generate Dockerfile
 					if err := generator.GenerateDockerfile(project, "."); err != nil {
-						return fmt.Errorf("failed to generate Dockerfile: %w", err)
+						fmt.Printf("⚠️  Warning: %v\n", err)
+						fmt.Println("Continuing with docker-compose.yml generation...")
+					} else {
+						fmt.Println("✅ Successfully generated Dockerfile")
 					}
 
 					// Generate docker-compose.yml
 					if err := generator.GenerateCompose(project, "."); err != nil {
 						return fmt.Errorf("failed to generate docker-compose.yml: %w", err)
 					}
+					fmt.Println("✅ Successfully generated docker-compose.yml")
 
-					fmt.Println("\n✅ Successfully generated Docker files!")
 					fmt.Println("\nNext steps:")
 					fmt.Println("1. Review the generated files")
 					fmt.Println("2. Build and run your container:")
