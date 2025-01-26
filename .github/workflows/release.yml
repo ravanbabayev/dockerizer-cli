@@ -21,24 +21,43 @@ jobs:
 
       - name: Build binaries
         run: |
+          mkdir -p build/windows build/linux build/darwin
+          
           # Windows
-          GOOS=windows GOARCH=amd64 go build -o build/dockerizer-windows-amd64.exe cmd/main.go
+          GOOS=windows GOARCH=amd64 go build -o build/windows/dockerizer.exe cmd/main.go
           
           # Linux
-          GOOS=linux GOARCH=amd64 go build -o build/dockerizer-linux-amd64 cmd/main.go
+          GOOS=linux GOARCH=amd64 go build -o build/linux/dockerizer cmd/main.go
           
           # macOS
-          GOOS=darwin GOARCH=amd64 go build -o build/dockerizer-darwin-amd64 cmd/main.go
+          GOOS=darwin GOARCH=amd64 go build -o build/darwin/dockerizer cmd/main.go
 
-      - name: Create release archives
+      - name: Prepare release packages
         run: |
           mkdir -p release
-          cp -r supported build/
           
+          # Copy support files to each platform directory
+          cp -r supported build/windows/
+          cp -r supported build/linux/
+          cp -r supported build/darwin/
+          
+          # Create archives
           cd build
-          zip -r ../release/dockerizer-windows-amd64.zip dockerizer-windows-amd64.exe supported/
-          tar czf ../release/dockerizer-linux-amd64.tar.gz dockerizer-linux-amd64 supported/
-          tar czf ../release/dockerizer-darwin-amd64.tar.gz dockerizer-darwin-amd64 supported/
+          
+          # Windows
+          cd windows
+          zip -r ../../release/dockerizer-windows-amd64.zip ./*
+          cd ..
+          
+          # Linux
+          cd linux
+          tar czf ../../release/dockerizer-linux-amd64.tar.gz ./*
+          cd ..
+          
+          # macOS
+          cd darwin
+          tar czf ../../release/dockerizer-darwin-amd64.tar.gz ./*
+          cd ..
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
