@@ -24,16 +24,16 @@ All supported technologies are defined in `supported/*.yaml`:
 ### Windows
 ```powershell
 # Run in PowerShell as Administrator
-irm https://raw.githubusercontent.com/USERNAME/dockerizer-cli/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/ravanbabayev/dockerizer-cli/main/install.ps1 | iex
 ```
 
 ### Linux/macOS
 ```bash
-curl -fsSL https://raw.githubusercontent.com/USERNAME/dockerizer-cli/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/ravanbabayev/dockerizer-cli/main/install.sh | bash
 ```
 
 ### Manual Installation
-1. Download the appropriate binary for your operating system from the [Releases](https://github.com/USERNAME/dockerizer-cli/releases) page
+1. Download the appropriate binary for your operating system from the [Releases](https://github.com/ravanbabayev/dockerizer-cli/releases) page
 2. Extract the archive
 3. Add the binary to your PATH
 
@@ -84,7 +84,7 @@ Next steps:
 ### Building from Source
 ```bash
 # Clone the repository
-git clone https://github.com/USERNAME/dockerizer-cli.git
+git clone https://github.com/ravanbabayev/dockerizer-cli.git
 cd dockerizer-cli
 
 # Build
