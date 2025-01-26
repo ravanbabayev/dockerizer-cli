@@ -5,6 +5,10 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write
+  packages: write
+
 jobs:
   build:
     name: Build and Release
@@ -13,6 +17,14 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Clean cache directory
+        run: |
+          rm -rf ${{ runner.tool_cache }}/go
+          rm -rf build
+          rm -rf release
 
       - name: Set up Go
         uses: actions/setup-go@v4
@@ -21,50 +33,60 @@ jobs:
 
       - name: Build binaries
         run: |
+          # Create fresh directories
           mkdir -p build/windows build/linux build/darwin
+          mkdir -p release
           
-          # Windows
+          # Build binaries
+          echo "Building Windows binary..."
           GOOS=windows GOARCH=amd64 go build -o build/windows/dockerizer.exe cmd/main.go
           
-          # Linux
+          echo "Building Linux binary..."
           GOOS=linux GOARCH=amd64 go build -o build/linux/dockerizer cmd/main.go
           
-          # macOS
+          echo "Building macOS binary..."
           GOOS=darwin GOARCH=amd64 go build -o build/darwin/dockerizer cmd/main.go
 
       - name: Prepare release packages
         run: |
-          mkdir -p release
+          # Debug: Show current directory structure
+          echo "Current directory structure:"
+          ls -la
           
-          # Copy support files to each platform directory
-          cp -r supported build/windows/
-          cp -r supported build/linux/
-          cp -r supported build/darwin/
+          # Check supported directory
+          if [ ! -d "supported" ]; then
+            echo "Error: supported directory not found"
+            pwd
+            exit 1
+          fi
           
-          # Create archives
-          cd build
+          # Create release packages
+          echo "Creating Windows package..."
+          cp -rv supported/* build/windows/
+          cd build/windows && zip -r ../../release/dockerizer-windows-amd64.zip . && cd ../..
           
-          # Windows
-          cd windows
-          zip -r ../../release/dockerizer-windows-amd64.zip ./*
-          cd ..
+          echo "Creating Linux package..."
+          cp -rv supported/* build/linux/
+          cd build/linux && tar czf ../../release/dockerizer-linux-amd64.tar.gz . && cd ../..
           
-          # Linux
-          cd linux
-          tar czf ../../release/dockerizer-linux-amd64.tar.gz ./*
-          cd ..
+          echo "Creating macOS package..."
+          cp -rv supported/* build/darwin/
+          cd build/darwin && tar czf ../../release/dockerizer-darwin-amd64.tar.gz . && cd ../..
           
-          # macOS
-          cd darwin
-          tar czf ../../release/dockerizer-darwin-amd64.tar.gz ./*
-          cd ..
+          # Verify release files
+          echo "Release files:"
+          ls -la release/
 
       - name: Create Release
+        id: create_release
         uses: softprops/action-gh-release@v1
         with:
           files: |
             release/dockerizer-windows-amd64.zip
             release/dockerizer-linux-amd64.tar.gz
             release/dockerizer-darwin-amd64.tar.gz
+          draft: false
+          prerelease: false
+          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
