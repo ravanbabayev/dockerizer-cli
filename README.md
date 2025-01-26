@@ -12,7 +12,7 @@ Dockerizer CLI is a command-line tool that automatically containerizes software 
 
 ## Supported Technologies
 
-All supported technologies are defined in `config/supported_tech.yaml`:
+All supported technologies are defined in `supported/*.yaml`:
 
 - **Languages**: Node.js, Python, Go, PHP, Ruby, Java
 - **Frameworks**: Next.js, React, Angular, Express, NestJS, Django, Flask, FastAPI, Gin, Fiber, Echo, Laravel, Symfony, Rails, Spring Boot
@@ -21,34 +21,28 @@ All supported technologies are defined in `config/supported_tech.yaml`:
 
 ## Installation
 
-### From Source (Using Go)
+### Windows
+```powershell
+# Run in PowerShell as Administrator
+irm https://raw.githubusercontent.com/USERNAME/dockerizer-cli/main/install.ps1 | iex
+```
 
-1. Install Go (1.16 or higher):
-   - https://golang.org/dl/
+### Linux/macOS
+```bash
+curl -fsSL https://raw.githubusercontent.com/USERNAME/dockerizer-cli/main/install.sh | bash
+```
 
-2. Clone the repository:
-   ```bash
-   git clone https://github.com/username/dockerizer-cli.git
-   cd dockerizer-cli
-   ```
-
-3. Build and install:
-   ```bash
-   make install
-   ```
-
-### Binary Installation
-
-1. Download the appropriate binary for your operating system from the [Releases](https://github.com/username/dockerizer-cli/releases) page
-2. Extract the downloaded archive
-3. Add the binary to your PATH or move it to an appropriate location
+### Manual Installation
+1. Download the appropriate binary for your operating system from the [Releases](https://github.com/USERNAME/dockerizer-cli/releases) page
+2. Extract the archive
+3. Add the binary to your PATH
 
 ## Usage
 
 Simply navigate to your project directory and run:
 
 ```bash
-dockerize init
+dockerizer init
 ```
 
 The tool will:
@@ -62,14 +56,17 @@ The tool will:
 
 ```bash
 $ cd my-project
-$ dockerize init
+$ dockerizer init
 
 ✔ Detected Node.js as the project language. Is this correct? [Y/n] y
 ✔ Detected React as the framework. Is this correct? [Y/n] y
+✔ Default port for React is 3000. Would you like to use a different port? [y/N] n
 ✔ Does your project need a database? [Y/n] y
 ✔ Select database type: PostgreSQL
+✔ Default port for PostgreSQL is 5432. Would you like to use a different port? [y/N] n
 
-Successfully generated Docker files!
+📦 Generating Docker files...
+✅ Successfully generated Docker files!
 
 Next steps:
 1. Review the generated files
@@ -79,9 +76,28 @@ Next steps:
 
 ## Requirements
 
-- Go 1.16 or higher (for building from source)
 - Docker
 - Docker Compose
+
+## Development
+
+### Building from Source
+```bash
+# Clone the repository
+git clone https://github.com/USERNAME/dockerizer-cli.git
+cd dockerizer-cli
+
+# Build
+make build
+
+# Install
+make install
+```
+
+### Running Tests
+```bash
+make test
+```
 
 ## License
 

@@ -1,0 +1,51 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    name: Build and Release
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+
+      - name: Build binaries
+        run: |
+          # Windows
+          GOOS=windows GOARCH=amd64 go build -o build/dockerizer-windows-amd64.exe cmd/main.go
+          
+          # Linux
+          GOOS=linux GOARCH=amd64 go build -o build/dockerizer-linux-amd64 cmd/main.go
+          
+          # macOS
+          GOOS=darwin GOARCH=amd64 go build -o build/dockerizer-darwin-amd64 cmd/main.go
+
+      - name: Create release archives
+        run: |
+          mkdir -p release
+          cp -r supported build/
+          
+          cd build
+          zip -r ../release/dockerizer-windows-amd64.zip dockerizer-windows-amd64.exe supported/
+          tar czf ../release/dockerizer-linux-amd64.tar.gz dockerizer-linux-amd64 supported/
+          tar czf ../release/dockerizer-darwin-amd64.tar.gz dockerizer-darwin-amd64 supported/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            release/dockerizer-windows-amd64.zip
+            release/dockerizer-linux-amd64.tar.gz
+            release/dockerizer-darwin-amd64.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 

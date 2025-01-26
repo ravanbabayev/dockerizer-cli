@@ -8,32 +8,31 @@ all: clean build
 
 build:
 	@echo "Building for multiple platforms..."
-	@mkdir -p $(BUILD_DIR)
-	@GOOS=linux GOARCH=amd64 go build -o $(BUILD_DIR)/$(BINARY_NAME)-linux-amd64 cmd/main.go
-	@GOOS=darwin GOARCH=amd64 go build -o $(BUILD_DIR)/$(BINARY_NAME)-darwin-amd64 cmd/main.go
-	@GOOS=windows GOARCH=amd64 go build -o $(BUILD_DIR)/$(BINARY_NAME)-windows-amd64.exe cmd/main.go
+	@if not exist "$(BUILD_DIR)" mkdir "$(BUILD_DIR)"
+	go build -o "$(BUILD_DIR)/$(BINARY_NAME)-windows-amd64.exe" cmd/main.go
+	set GOOS=linux&& go build -o "$(BUILD_DIR)/$(BINARY_NAME)-linux-amd64" cmd/main.go
+	set GOOS=darwin&& go build -o "$(BUILD_DIR)/$(BINARY_NAME)-darwin-amd64" cmd/main.go
 	@echo "Done!"
 
 install: build
 	@echo "Installing..."
-	@go install ./cmd
+	go install ./cmd
 	@echo "Done!"
 
 clean:
 	@echo "Cleaning..."
-	@rm -rf $(BUILD_DIR)
+	@if exist "$(BUILD_DIR)" rd /s /q "$(BUILD_DIR)"
 	@echo "Done!"
 
 test:
 	@echo "Running tests..."
-	@go test -v ./...
+	go test -v ./...
 	@echo "Done!"
 
 # Create release archives
 release: build
 	@echo "Creating release archives..."
-	@cd $(BUILD_DIR) && \
-		tar czf $(BINARY_NAME)-linux-amd64-$(VERSION).tar.gz $(BINARY_NAME)-linux-amd64 && \
-		tar czf $(BINARY_NAME)-darwin-amd64-$(VERSION).tar.gz $(BINARY_NAME)-darwin-amd64 && \
-		zip $(BINARY_NAME)-windows-amd64-$(VERSION).zip $(BINARY_NAME)-windows-amd64.exe
+	cd "$(BUILD_DIR)" && tar -czf "$(BINARY_NAME)-linux-amd64-$(VERSION).tar.gz" "$(BINARY_NAME)-linux-amd64"
+	cd "$(BUILD_DIR)" && tar -czf "$(BINARY_NAME)-darwin-amd64-$(VERSION).tar.gz" "$(BINARY_NAME)-darwin-amd64"
+	cd "$(BUILD_DIR)" && powershell Compress-Archive -Path "$(BINARY_NAME)-windows-amd64.exe" -DestinationPath "$(BINARY_NAME)-windows-amd64-$(VERSION).zip"
 	@echo "Done!" 
