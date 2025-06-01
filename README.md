@@ -14,8 +14,8 @@ Dockerizer CLI is a command-line tool that automatically containerizes software 
 
 All supported technologies are defined in `supported/*.yaml`:
 
-- **Languages**: Node.js, Python, Go, PHP, Ruby, Java
-- **Frameworks**: Next.js, React, Angular, Express, NestJS, Django, Flask, FastAPI, Gin, Fiber, Echo, Laravel, Symfony, Rails, Spring Boot
+- **Languages**: Node.js, Python, Go, PHP, Ruby
+- **Frameworks**: Next.js, React, Angular, Express, NestJS, Django, Flask, FastAPI, Gin, Fiber, Echo, Laravel, Symfony, Rails
 - **Databases**: PostgreSQL, MySQL, MongoDB
 - **Cache**: Redis
 
